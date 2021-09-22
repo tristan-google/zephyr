@@ -21,6 +21,8 @@ manifest:
   remotes:
     - name: upstream
       url-base: https://github.com/zephyrproject-rtos
+    - name: meekrosoft
+      url-base: https://github.com/meekrosoft
 
   #
   # Please add items below based on alphabetical order
@@ -46,6 +48,12 @@ manifest:
       path: modules/fs/fatfs
       groups:
         - fs
+    - name: fff
+      remote: meekrosoft
+      revision: pull/102/head
+      path: modules/lib/fff
+      groups:
+        - ci
     - name: hal_altera
       revision: 23c1c1dd7a0c1cc9a399509d1819375847c95b97
       path: modules/hal/altera
@@ -215,6 +223,9 @@ manifest:
       revision: c74be3890c9d975976fde1b1a3b2f5742bec34c0
       groups:
         - tee
+
+  group-filter:
+    - -ci
 
   self:
     path: zephyr

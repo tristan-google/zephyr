@@ -1,0 +1,10 @@
+tests:
+  testing.ztest.mock_fff:
+    tags: test_framework
+    integration_platforms:
+      - native_posix
+  testing.ztest.mock_fff_global:
+    tags: test_framework
+    extra_args: CONF_FILE=prj_global.conf
+    integration_platforms:
+      - native_posix
