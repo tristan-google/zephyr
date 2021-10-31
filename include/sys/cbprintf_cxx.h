@@ -52,6 +52,7 @@ static inline int z_cbprintf_cxx_is_pchar(const volatile wchar_t *)
 template < typename T >
 static inline int z_cbprintf_cxx_is_pchar(T arg)
 {
+	ARG_UNUSED(arg);
 	_Pragma("GCC diagnostic push")
 	_Pragma("GCC diagnostic ignored \"-Wpointer-arith\"")
 	return 0;
