@@ -780,43 +780,77 @@ class ProjectBuilder(FilterBuilder):
                              )
         sys.stdout.flush()
 
-    def cmake(self):
+    @staticmethod
+    def cmake_assemble_args(args, handler, extra_conf_files, extra_overlay_confs,
+                            extra_dtc_overlay_files, cmake_extra_args,
+                            build_dir):
+        if handler.ready:
+            args.extend(handler.args)
 
-        instance = self.instance
-        args = self.testsuite.extra_args[:]
+        def extract_fields_from_arg_list(target_field: str, arg_list: list):
+            """
+            Given a list of "FIELD=VALUE" args, extract values of args with a
+            given field name and return the remaining args.
+            """
 
-        if instance.handler.ready:
-            args += instance.handler.args
-
-        # merge overlay files into one variable
-        # overlays with prefixes won't be merged but pass to cmake as they are
-        def extract_overlays(args):
-            re_overlay = re.compile(r'^\s*OVERLAY_CONFIG=(.*)')
+            pattern = re.compile(f"{target_field}=(.*)")
             other_args = []
-            overlays = []
-            for arg in args:
-                match = re_overlay.search(arg)
+            target_field_values = []
+            for arg in arg_list:
+                match = pattern.search(arg)
                 if match:
-                    overlays.append(match.group(1).strip('\'"'))
+                    target_field_values.append(match.group(1).strip('\'"'))
                 else:
                     other_args.append(arg)
 
-            args[:] = other_args
-            return overlays
+            return target_field_values, other_args
 
-        overlays = extract_overlays(args)
+        # Search for conf files specified in extra_args, then combine with conf files
+        # specified in extra_conf_files
+        extra_confs, args = extract_fields_from_arg_list("CONF_FILE", args)
+        extra_confs.extend(extra_conf_files)
+        if extra_confs:
+            args.append(f"CONF_FILE=\"{';'.join(extra_confs)}\"")
 
-        if os.path.exists(os.path.join(instance.build_dir,
-                                       "twister", "testsuite_extra.conf")):
-            overlays.append(os.path.join(instance.build_dir,
-                                         "twister", "testsuite_extra.conf"))
+        # Search for DTC overlay files specified in extra_args, then combine with DTC
+        # overlay files specified in extra_dtc_overlay_files
+        extra_dtc_overlays, args = extract_fields_from_arg_list("DTC_OVERLAY_FILE", args)
+        extra_dtc_overlays.extend(extra_dtc_overlay_files)
+        if extra_dtc_overlays:
+            args.append(f"DTC_OVERLAY_FILE=\"{';'.join(extra_dtc_overlays)}\"")
+
+        # merge overlay files into one variable
+
+        overlays, args = extract_fields_from_arg_list("OVERLAY_CONFIG", args)
+        overlays.extend(extra_overlay_confs)
+
+        additional_overlay_path = os.path.join(
+            build_dir, "twister", "testsuite_extra.conf"
+        )
+        if os.path.exists(additional_overlay_path):
+            overlays.append(additional_overlay_path)
 
         if overlays:
             args.append("OVERLAY_CONFIG=\"%s\"" % (" ".join(overlays)))
 
-        args_expanded = ["-D{}".format(a.replace('"', '\"')) for a in self.options.extra_args]
-        args_expanded = args_expanded + ["-D{}".format(a.replace('"', '')) for a in args]
-        res = self.run_cmake(args_expanded)
+        # Build the final argument list
+        args_expanded = ["-D{}".format(a.replace('"', '\"')) for a in cmake_extra_args]
+        args_expanded.extend(["-D{}".format(a.replace('"', '')) for a in args])
+
+        return args_expanded
+
+    def cmake(self):
+        args = self.cmake_assemble_args(
+            self.testsuite.extra_args.copy(),
+            self.instance.handler,
+            self.testsuite.extra_conf_files,
+            self.testsuite.extra_overlay_confs,
+            self.testsuite.extra_dtc_overlay_files,
+            self.options.extra_args,
+            self.instance.build_dir,
+        )
+
+        res = self.run_cmake(args)
         return res
 
     def build(self):
