@@ -1,0 +1,11 @@
+# Copyright (c) 2023 Google LLC
+# SPDX-License-Identifier: Apache-2.0
+
+config RUN_GENERIC_SENSOR_TEST
+    bool "Compile and run the generic sensor tests"
+    depends on ZTEST && ZTEST_NEW_API
+    help Enables building and running the generic sensor test suite that will
+         iterate through the device tree and sun sample path tests on any
+         sensor that supports the backend sensor emulator API.
+
+source "Kconfig.zephyr"
