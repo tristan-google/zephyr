@@ -18,8 +18,8 @@
 #include <zephyr/arch/riscv/thread.h>
 #include <zephyr/arch/riscv/exp.h>
 #include <zephyr/arch/riscv/irq.h>
+#include <zephyr/arch/riscv/sys_io.h>
 #include <zephyr/arch/common/sys_bitops.h>
-#include <zephyr/arch/common/sys_io.h>
 #include <zephyr/arch/common/ffs.h>
 #if defined(CONFIG_USERSPACE)
 #include <zephyr/arch/riscv/syscall.h>
@@ -300,8 +300,8 @@ static inline uint64_t arch_k_cycle_get_64(void)
 
 #endif /*_ASMLANGUAGE */
 
-#if defined(CONFIG_SOC_FAMILY_RISCV_PRIVILEGE)
-#include <zephyr/arch/riscv/riscv-privilege/asm_inline.h>
+#if defined(CONFIG_SOC_FAMILY_RISCV_PRIVILEGED)
+#include <zephyr/arch/riscv/riscv-privileged/asm_inline.h>
 #endif
 
 

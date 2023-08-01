@@ -913,6 +913,12 @@ static int method_from_code(const struct coap_resource *resource,
 	}
 }
 
+
+static inline bool is_empty_message(const struct coap_packet *cpkt)
+{
+	return __coap_header_get_code(cpkt) == COAP_CODE_EMPTY;
+}
+
 static bool is_request(const struct coap_packet *cpkt)
 {
 	uint8_t code = coap_header_get_code(cpkt);
@@ -1281,7 +1287,7 @@ int coap_pending_init(struct coap_pending *pending,
 
 	pending->data = request->data;
 	pending->len = request->offset;
-	pending->t0 = k_uptime_get_32();
+	pending->t0 = k_uptime_get();
 	pending->retries = retries;
 
 	return 0;
@@ -1376,7 +1382,7 @@ struct coap_pending *coap_pending_next_to_expire(
 {
 	struct coap_pending *p, *found = NULL;
 	size_t i;
-	uint32_t expiry, min_expiry;
+	int64_t expiry, min_expiry = INT64_MAX;
 
 	for (i = 0, p = pendings; i < len; i++, p++) {
 		if (!p->timeout) {
@@ -1385,7 +1391,7 @@ struct coap_pending *coap_pending_next_to_expire(
 
 		expiry = p->t0 + p->timeout;
 
-		if (!found || (int32_t)(expiry - min_expiry) < 0) {
+		if (expiry < min_expiry) {
 			min_expiry = expiry;
 			found = p;
 		}
@@ -1464,6 +1470,11 @@ struct coap_reply *coap_response_received(
 	uint16_t id;
 	uint8_t tkl;
 	size_t i;
+
+	if (!is_empty_message(response) && is_request(response)) {
+		/* Request can't be response */
+		return NULL;
+	}
 
 	id = coap_header_get_id(response);
 	tkl = coap_header_get_token(response, token);
