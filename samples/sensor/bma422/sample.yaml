@@ -1,0 +1,9 @@
+sample:
+  name: BMA422 Sensor sample
+tests:
+  sample.sensor.bma422:
+    harness: sensor
+    tags:
+      - samples
+      - sensor
+    depends_on: i2c

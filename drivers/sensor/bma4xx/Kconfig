@@ -1,4 +1,4 @@
-# BMA4XX 3-axis accelerometer config options
+# BMA422 3-axis accelerometer config options
 #
 # Copyright (c) 2023 Google LLC
 #
@@ -11,7 +11,7 @@ config BMA4XX
 	depends on SENSOR_ASYNC_API
 	select I2C
 	help
-	  Enable driver for Bosch BMA4XX (I2C-based)
+	  Enable driver for Bosch BMA422 (I2C-based)
 
 config BMA4XX_TEMPERATURE
 	bool "Allow reading the BMA4XX die temperature"
