@@ -1,0 +1,14 @@
+sample:
+  name: BMA422 Sensor sample
+tests:
+  sample.sensor.bma422:
+    harness: console
+    tags: sensors
+    platform_allow:
+    integration_platforms:
+    harness_config:
+      type: one_line
+      regex:
+        - "temp: (.*); press: (.*); humidity: (.*)"
+      fixture: fixture_i2c_bma422
+
