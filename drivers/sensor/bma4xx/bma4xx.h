@@ -9,6 +9,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/sensor.h>
 
 #if DT_ANY_INST_ON_BUS_STATUS_OKAY(spi)
@@ -98,6 +99,14 @@
 
 #define BMA4XX_BIT_ACC_EN BIT(2)
 
+#define BMA4XX_BIT_INT1_OUT_EN BIT(3)
+#define BMA4XX_BIT_INT1_EDGE_CTRL BIT(0)
+
+#define BMA4XX_BIT_INT1_DATA_READY BIT(2)
+#define BMA4XX_BIT_INT1_FIFO_WM    BIT(1)
+#define BMA4XX_BIT_INT1_FIFO_FULL  BIT(0)
+#define BMA4XX_MASK_INT1           GENMASK(2, 0)
+
 /* Bandwidth parameters */
 #define BMA4XX_BWP_OSR4_AVG1  (0x0)
 #define BMA4XX_BWP_OSR2_AVG2  (0x1)
@@ -170,6 +179,7 @@ union bma4xx_bus_cfg {
 struct bma4xx_config {
 	int (*bus_init)(const struct device *dev);
 	const union bma4xx_bus_cfg bus_cfg;
+	struct gpio_dt_spec gpio_int1;
 };
 
 /** Used to implement bus-specific R/W operations. See bma4xx_i2c.c and
@@ -194,6 +204,22 @@ struct bma4xx_data {
 	const struct bma4xx_hw_operations *hw_ops;
 	/** Chip ID value stored in BMA4XX_REG_CHIP_ID */
 	uint8_t chip_id;
+
+#ifdef CONFIG_BMA4XX_STREAM
+	struct k_work work;
+	struct rtio_iodev_sqe *streaming_sqe;
+	struct rtio *rtio;
+	struct rtio_iodev *iodev;
+	uint8_t int_status;
+	uint16_t fifo_count;
+	uint64_t timestamp;
+	atomic_t reading_fifo;
+	const struct device *dev;
+	struct gpio_callback gpio_cb;
+	sensor_trigger_handler_t data_ready_handler;
+	const struct sensor_trigger *data_ready_trigger;
+	struct k_mutex mutex;
+#endif /* CONFIG_BMA4XX_STREAM */
 };
 
 /*
@@ -221,6 +247,14 @@ struct bma4xx_encoded_data {
 	int8_t temp;
 #endif /* CONFIG_BMA4XX_TEMPERATURE */
 };
+
+struct bma4xx_fifo_data {
+	struct bma4xx_decoder_header header;
+	uint8_t int_status;
+	uint16_t accel_odr: 4;
+	uint16_t fifo_count: 11;
+	uint16_t reserved: 1;
+} __attribute__((__packed__));
 
 int bma4xx_spi_init(const struct device *dev);
 int bma4xx_i2c_init(const struct device *dev);

@@ -7,6 +7,7 @@
 
 #define DT_DRV_COMPAT bosch_bma4xx
 
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/init.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/__assert.h>
@@ -429,6 +430,107 @@ static int bma4xx_submit(const struct device *dev, struct rtio_iodev_sqe *iodev_
 
 	return -ENOTSUP;
 }
+
+/*
+ * RTIO streaming / interrupt support
+ */
+
+#ifdef CONFIG_BMA4XX_STREAMING
+
+static void bma4xx_lock(const struct device *dev)
+{
+	struct bma4xx_data *data = dev->data;
+
+	k_mutex_lock(&data->mutex, K_FOREVER);
+}
+
+static void bma4xx_unlock(const struct device *dev)
+{
+	struct bma4xx_data *data = dev->data;
+
+	k_mutex_unlock(&data->mutex);
+}
+
+static void bma4xx_work_handler(struct k_work *work)
+{
+	struct bma4xx_data *data = CONTAINER_OF(work, struct bma4xx_data, work);
+
+	bma4xx_lock(data->dev);
+
+	if (data->data_ready_handler != NULL) {
+		data->data_ready_handler(data->dev, data->data_ready_trigger);
+	}
+
+	bma4xx_unlock(data->dev);
+}
+
+static void bma4xx_gpio_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+	struct bma4xx_data *data = CONTAINER_OF(cb, struct bma4xx_data, gpio_cb);
+
+	ARG_UNUSED(dev);
+	ARG_UNUSED(pins);
+
+	k_work_submit(&data->work);
+
+	icm42688_fifo_event(data->dev);
+}
+
+static int bma4xx_interrupt_init(const struct device *dev)
+{
+	struct bma4xx_data *data = dev->data;
+	const struct bma4xx_config *cfg = dev->config;
+	int res = 0;
+
+	if (!cfg->gpio_int1.port) {
+		LOG_ERR("Streaming enabled but no interrupt gpio supplied");
+		return -ENODEV;
+	}
+
+	if (!gpio_is_ready_dt(&cfg->gpio_int1)) {
+		LOG_ERR("GPIO for interrupt not ready");
+		return -ENODEV;
+	}
+
+	data->dev = dev;
+	gpio_pin_configure_dt(&cfg->gpio_int1, GPIO_INPUT);
+	gpio_init_callback(&data->gpio_cb, bma4xx_gpio_callback, BIT(cfg->gpio_int1.pin));
+	res = gpio_add_callback(cfg->gpio_int1.port, &data->gpio_cb);
+
+	if (res < 0) {
+		LOG_ERR("Failed to set gpio callback: %d", res);
+		return res;
+	}
+
+	k_mutex_init(&data->mutex);
+
+	data->work.handler = icm42688_work_handler;
+
+	return gpio_pin_interrupt_configure_dt(&cfg->gpio_int1, GPIO_INT_EDGE_TO_ACTIVE);
+}
+
+static int bma4xx_trigger_update_interrupts(const struct device *dev, uint8_t interrupts)
+{
+	struct bma4xx_data *data = dev->data;
+	int res;
+
+	/* Turn on the interrupt output */
+	res = bma4xx->hw_ops->update_reg(dev, BMA4XX_REG_INT1_IO_CTRL, BMA4XX_BIT_INT1_OUT_EN,
+					 BMA4XX_BIT_INT1_OUT_EN);
+	if (res != 0) {
+		return res;
+	}
+
+	/* Enable chosen interrupts on INT1 pin */
+	return bma4xx->hw_ops->update_reg(dev, BMA4XX_REG_INT_MAP_DATA, BMA4XX_MASK_INT1,
+					  interrupts);
+}
+
+#endif /* CONFIG_BMA4XX_STREAMING */
+
+/*
+ * RTIO 
+ */
 
 /*
  * RTIO decoder

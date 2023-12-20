@@ -21,6 +21,14 @@ config BMA4XX_TEMPERATURE
 	  Allow reading the BMA4xx's on-chip temperature sensor. This creates
 	  extra bus activity and increases code size.
 
+config BMA4XX_STREAMING
+	bool "Allow FIFO-based RTIO streaming operation"
+	default n
+	depends on BMA4XX
+	help
+	  Activates support for streaming data from the BAM4xx's FIFO through
+	  the RTIO system.
+
 config EMUL_BMA4XX
 	bool "Emulator for the BMA4XX"
 	default y
